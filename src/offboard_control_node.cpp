@@ -20,7 +20,7 @@ namespace px4_offboard
         this->publish_vehicle_command(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1);
     }
 
-    void OffboardControllerNode::publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0)
+    void OffboardControllerNode::publish_vehicle_command(uint16_t command, float param1, float param2)
     {
         px4_msgs::msg::VehicleCommand msg{};
         msg.param1 = param1;

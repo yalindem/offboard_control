@@ -34,4 +34,4 @@ namespace px4_offboard
 }
 
 
-#endif CPP_OFFBOARD_CONTROL_NODE_HPP_
+#endif
