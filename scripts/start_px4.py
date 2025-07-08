@@ -14,7 +14,7 @@ def main():
     # Üçüncü komut: PX4_GZ_WORLD=walls make px4_sitl gz_x500_depth
     px4_env = os.environ.copy()
     px4_env['PX4_GZ_WORLD'] = 'walls'
-    px4_process = subprocess.Popen(['make', 'px4_sitl', 'gz_x500_depth'], env=px4_env)
+    px4_process = subprocess.Popen(['make', 'px4_sitl', 'gz_x500_vision'], env=px4_env)
 
     # İşlemlerin tamamlanmasını bekleyin
     agent_process.wait()
