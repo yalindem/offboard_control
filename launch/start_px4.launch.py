@@ -24,7 +24,7 @@ def generate_launch_description():
 
     # PX4 SITL + Gazebo başlat
     px4_gz = ExecuteProcess(
-        cmd=["make", "px4_sitl", "gz_x500_depth"],
+        cmd=["make", "px4_sitl", "gz_x500_mono_cam"],
         cwd=px4_dir,
         output="screen",
         additional_env={"PX4_GZ_WORLD": "walls"}
@@ -35,10 +35,9 @@ def generate_launch_description():
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=[
-            '/camera@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/depth_camera@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
+           '/world/walls/model/x500_mono_cam_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
+           '/world/walls/model/x500_mono_cam_0/link/lidar_link/sensor/front_lidar/scan/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
+           '/world/walls/model/x500_mono_cam_0/link/lidar_link/sensor/front_lidar/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
         ],
         output='screen'
     )
@@ -49,9 +48,16 @@ def generate_launch_description():
         output='screen'
     )
 
+    range_detector_node = Node(
+        package='offboard_control',
+        executable='range_detector_node',
+        output='screen'
+    )
+
     return LaunchDescription([
         microxrce_agent,
         px4_gz,
         ros_gz_bridge,
-        offboard_controller_node
+        offboard_controller_node,
+        range_detector_node
     ])
