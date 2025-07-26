@@ -36,8 +36,8 @@ namespace px4_offboard
     void OffboardControllerNode::publish_trajectory_setpoint()
     {
         px4_msgs::msg::TrajectorySetpoint msg{};
-        msg.position = {0.0, 0.0, -3.0};
-        msg.yaw = 0.0;
+        msg.position = {2.0, 0.0, -3.0};
+        msg.yaw = 0;
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
         trajectory_setpoint_publisher_->publish(msg);
     }

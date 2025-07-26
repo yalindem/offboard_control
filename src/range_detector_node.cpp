@@ -10,21 +10,25 @@ namespace px4_offboard
 
     void PointCloudSubscriber::pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        sensor_msgs::PointCloud2Iterator<float> iter_x(*msg, "x");
-        sensor_msgs::PointCloud2Iterator<float> iter_y(*msg, "y");
-        sensor_msgs::PointCloud2Iterator<float> iter_z(*msg, "z");
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(*msg, *cloud);
 
-        for(size_t i = 0; i < msg->height * msg->width; ++i, ++iter_x, ++iter_y, ++iter_z) 
-        {
-            float x = *iter_x;
-            float y = *iter_y;
-            float z = *iter_z;
-            float distance = std::sqrt(x * x + y * y + z * z);
-            RCLCPP_INFO(this->get_logger(), "Point: (%.2f, %.2f, %.2f), Distance: %.2f m", x, y, z, distance);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+
+        pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+        voxel_filter.setInputCloud(cloud);  
+        voxel_filter.setLeafSize(0.1f, 0.1f, 0.1f);
+        voxel_filter.filter(*cloud_filtered); 
+
+        RCLCPP_INFO(this->get_logger(), "Received point cloud with %lu points", cloud_filtered->points.size());
+
+        for (size_t i = 0; i < std::min<size_t>(5, cloud_filtered->points.size()); ++i) {
+            const auto& pt = cloud_filtered->points[i];
+            float distance = std::sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
+            RCLCPP_INFO(this->get_logger(), "Point: (%.2f, %.2f, %.2f), Distance: %.2f m", pt.x, pt.y, pt.z, distance);
         }
 
     }
-    
 }
 
 int main(int argc, char *argv[])
