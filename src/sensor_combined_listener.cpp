@@ -24,6 +24,19 @@ namespace px4_offboard
         std::cout << "accelerometer_m_s2[2]: " << msg->accelerometer_m_s2[2] << std::endl;
         std::cout << "accelerometer_integral_dt: " << msg->accelerometer_integral_dt << std::endl;
         }); 
+
+        gps_sub_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,
+        [this](const px4_msgs::msg::SensorGps::UniquePtr msg) {
+        std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+        std::cout << "RECEIVED SENSOR GPS DATA"   << std::endl;
+        std::cout << "============================="   << std::endl;
+        std::cout << "ts: "          << msg->timestamp    << std::endl;
+        std::cout << "latitude_deg: " << msg->latitude_deg  << std::endl;
+        std::cout << "longitude_deg: " << msg->longitude_deg  << std::endl;
+        std::cout << "satellites_used: " << msg->satellites_used  << std::endl;
+        std::cout << "heading: " << msg->heading  << std::endl;
+        
+        }); 
     }
 }
 int main(int argc, char* argv[])
