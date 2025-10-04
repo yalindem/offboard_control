@@ -5,24 +5,22 @@ using namespace std::chrono_literals;
 
 namespace px4_offboard
 {
-    OffboardController::OffboardControllerNode(std::string node_name) : Node(node_name)
+    OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
-        //offboard_control_mode_publisher_ = this->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
-        //trajectory_setpoint_publisher_ = this->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-		vehicle_command_publisher_ = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
-        timer_ = this->create_wall_timer(100ms, std::bind(&OffboardControllerNode::timer_callback, this)); // 2hz is important because px4 requires to be able to be in offboard mode
-        offboard_setpoint_counter_ = 0;
-
+        this->vehicle_command_client_ = this->create_client<px4_msgs::srv::VehicleCommand>("/fmu/vehicle_command");
     }
 
-    void OffboardController::timer_callback()
+    void OffboardController::arm()
     {
-        this->publish_vehicle_command(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1);
+        RCLCPP_INFO(this->get_logger(), "requesting arm");
+        request_vehicle_command(VehicleCommandMessage::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
     }
 
-    void OffboardController::publish_vehicle_command(uint16_t command, float param1, float param2)
+    void OffboardController::request_vehicle_command(uint16_t command, float param1, float param2)
     {
-        px4_msgs::msg::VehicleCommand msg{};
+        auto request = std::make_shared<px4_msgs::srv::VehicleCommand::Request>();
+
+        VehicleCommandMessage msg{};
         msg.param1 = param1;
         msg.param2 = param2;
         msg.command = command;
@@ -32,9 +30,18 @@ namespace px4_offboard
         msg.source_component = 1;
         msg.from_external = true;
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-        vehicle_command_publisher_->publish(msg);
+        request->request = msg;
+
+        service_done_ = false;
+        auto result = vehicle_command_client_->async_send_request(request, std::bind(&OffboardControl::response_callback, this,
+                                std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Command send");
     }
-    
+	
+    void OffboardController::response_callback(VehicleCommandFuture future)
+    {
+
+    }
 
 }
 
