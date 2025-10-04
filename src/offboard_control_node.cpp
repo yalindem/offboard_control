@@ -8,15 +8,21 @@ namespace px4_offboard
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
+        if (!vehicle_command_client_->wait_for_service(1s)) {
+            RCLCPP_WARN(get_logger(), "Service not available");
+        }
+        else{
+            RCLCPP_WARN(get_logger(), "Service is ready");
+        }
     }
 
     void OffboardController::arm()
     {
-        RCLCPP_INFO(this->get_logger(), "requesting arm");
+        RCLCPP_INFO(this->get_logger(), "Requesting arm");
         request_vehicle_command(VehicleCommandMessage::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0, 0.0);
     }
 
-    void OffboardController::request_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0)
+    void OffboardController::request_vehicle_command(uint16_t command, float param1, float param2)
     {
         auto request = std::make_shared<VehicleCommandSrv::Request>();
 
@@ -34,8 +40,7 @@ namespace px4_offboard
 
         service_done_ = false;
         auto result = vehicle_command_client_->async_send_request(request, 
-                                                                  std::bind(&OffboardController::response_callback, this,
-                                                                  std::placeholders::_1));
+                                                                  std::bind(&OffboardController::response_callback, this, std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "Command send");
     }
 	

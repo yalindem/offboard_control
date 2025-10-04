@@ -27,7 +27,7 @@ namespace px4_offboard
         private:
             VehicleCommandSharedPtr vehicle_command_client_;
             void arm();
-            void request_vehicle_command(std::uint16_t command, float param1, float param2);
+            void request_vehicle_command(std::uint16_t command, float param1 = 0.0, float param2 = 0.0);
 	        void response_callback(VehicleCommandSharedFuture future);
             
 
