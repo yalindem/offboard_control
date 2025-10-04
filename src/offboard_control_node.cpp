@@ -12,7 +12,7 @@ namespace px4_offboard
             RCLCPP_WARN(get_logger(), "Service not available");
         }
         else{
-            RCLCPP_WARN(get_logger(), "Service is ready");
+            RCLCPP_INFO(this->get_logger(), GREEN("Service is ready"));
         }
     }
 
@@ -47,6 +47,42 @@ namespace px4_offboard
     void OffboardController::response_callback(VehicleCommandSharedFuture future)
     {
         RCLCPP_INFO(this->get_logger(), "Response callback Send starting ...");
+        auto response = future.get();
+        RCLCPP_INFO(this->get_logger(), "VehicleCommand response received!");
+
+        switch (response->reply.result)
+        {
+            case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED:
+                RCLCPP_INFO(this->get_logger(), GREEN("Command accepted by PX4"));
+                RCLCPP_INFO(this->get_logger(), "Command: %u", response->reply.command);
+                service_done_ = true;
+                arm_retry_count_ = 0;
+                break;
+
+            case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
+            case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_DENIED:
+                RCLCPP_WARN(this->get_logger(), "Command temporarily rejected");
+                if (arm_retry_count_ < max_arm_retries_)
+                {
+                    arm_retry_count_++;
+                    RCLCPP_INFO(this->get_logger(), "Retry attempt %d", arm_retry_count_);
+                    this->arm();
+                }
+                else
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Max ARM retries reached");
+                    service_done_ = true;
+                }
+                break;
+
+            default:
+                RCLCPP_WARN(this->get_logger(), "Command result: %u", response->reply);
+                arm_retry_count_ = 0;
+                service_done_ = true;
+                break;
+        }
+
+
     }
 
     void OffboardController::run()

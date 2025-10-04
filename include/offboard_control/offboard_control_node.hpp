@@ -15,6 +15,8 @@ using VehicleCommandSharedFuture = VehicleCommandClient::SharedFuture;
 using VehicleCommandMessage = px4_msgs::msg::VehicleCommand;
 using VehicleCommandMessageAck = px4_msgs::msg::VehicleCommandAck;
 
+#define GREEN(text) "\033[1;32m" text "\033[0m"
+
 namespace px4_offboard
 {
 
@@ -32,6 +34,8 @@ namespace px4_offboard
             
 
             bool service_done_ = false;
+            int arm_retry_count_ = 0;
+            const int max_arm_retries_ = 5;
     };
 
 }
