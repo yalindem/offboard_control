@@ -14,12 +14,38 @@ namespace px4_offboard
         else{
             RCLCPP_INFO(this->get_logger(), GREEN("Service is ready"));
         }
-    }
+
+        rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort();
+
+        // Abone Oluşturma: /fmu/out/vehicle_status konusuna abone oluyoruz
+        vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+            "/fmu/out/vehicle_status", 
+            qos_profile, 
+            // Geri çağırım (callback) fonksiyonunu tanımlıyoruz
+            std::bind(&OffboardController::status_callback, this, std::placeholders::_1));
+        }
 
     void OffboardController::arm()
     {
         RCLCPP_INFO(this->get_logger(), "Requesting arm");
         request_vehicle_command(VehicleCommandMessage::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0, 0.0);
+        this->arming_requested_ = true;
+    }
+
+    void OffboardController::status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
+    {
+        switch (msg->arming_state)
+        {
+            case px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED:
+                this->state_ = State::armed;
+                break;
+            case px4_msgs::msg::VehicleStatus::ARMING_STATE_DISARMED:
+                this->state_ = State::disarmed;
+                break;
+            default:
+                this->state_ = State::pre_flight;
+                break;
+        }
     }
 
     void OffboardController::request_vehicle_command(uint16_t command, float param1, float param2)
@@ -55,8 +81,6 @@ namespace px4_offboard
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED:
                 RCLCPP_INFO(this->get_logger(), GREEN("Command accepted by PX4"));
                 RCLCPP_INFO(this->get_logger(), "Command: %u", response->reply.command);
-                service_done_ = true;
-                arm_retry_count_ = 0;
                 break;
 
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
@@ -71,7 +95,6 @@ namespace px4_offboard
                 else
                 {
                     RCLCPP_ERROR(this->get_logger(), "Max ARM retries reached");
-                    service_done_ = true;
                 }
                 break;
 
@@ -88,6 +111,11 @@ namespace px4_offboard
     void OffboardController::run()
     {
         RCLCPP_INFO(this->get_logger(), "Trying to Arm");
+        
+        while(this->state_ != 1 && arming_requested_ == false)
+        {
+            this->arm();
+        }
         this->arm();
     }
 
