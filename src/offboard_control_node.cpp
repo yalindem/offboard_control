@@ -7,6 +7,11 @@ namespace px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
+        rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort(); 
+        vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+            "/fmu/out/vehicle_status_v1", 
+            qos_profile,
+            std::bind(&OffboardController::vehicle_status_callback, this, std::placeholders::_1));
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
         if (!vehicle_command_client_->wait_for_service(1s)) {
             RCLCPP_WARN(get_logger(), "Service not available");
@@ -14,16 +19,7 @@ namespace px4_offboard
         else{
             RCLCPP_INFO(this->get_logger(), GREEN("Service is ready"));
         }
-
-        rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort();
-
-        // Abone Oluşturma: /fmu/out/vehicle_status konusuna abone oluyoruz
-        vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
-            "/fmu/out/vehicle_status", 
-            qos_profile, 
-            // Geri çağırım (callback) fonksiyonunu tanımlıyoruz
-            std::bind(&OffboardController::status_callback, this, std::placeholders::_1));
-        }
+    }
 
     void OffboardController::arm()
     {
@@ -32,8 +28,9 @@ namespace px4_offboard
         this->arming_requested_ = true;
     }
 
-    void OffboardController::status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
+    void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
     {
+        RCLCPP_INFO(this->get_logger(), "State: %d", state_);
         switch (msg->arming_state)
         {
             case px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED:
@@ -64,7 +61,6 @@ namespace px4_offboard
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
         request->request = msg;
 
-        service_done_ = false;
         auto result = vehicle_command_client_->async_send_request(request, 
                                                                   std::bind(&OffboardController::response_callback, this, std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "Command send");
@@ -86,22 +82,10 @@ namespace px4_offboard
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_DENIED:
                 RCLCPP_WARN(this->get_logger(), "Command temporarily rejected");
-                if (arm_retry_count_ < max_arm_retries_)
-                {
-                    arm_retry_count_++;
-                    RCLCPP_INFO(this->get_logger(), "Retry attempt %d", arm_retry_count_);
-                    this->arm();
-                }
-                else
-                {
-                    RCLCPP_ERROR(this->get_logger(), "Max ARM retries reached");
-                }
                 break;
 
             default:
                 RCLCPP_WARN(this->get_logger(), "Command result: %u", response->reply);
-                arm_retry_count_ = 0;
-                service_done_ = true;
                 break;
         }
 
@@ -111,12 +95,12 @@ namespace px4_offboard
     void OffboardController::run()
     {
         RCLCPP_INFO(this->get_logger(), "Trying to Arm");
-        
-        while(this->state_ != 1 && arming_requested_ == false)
+        while(this->state_ != 1 && !arming_requested_)
         {
+            RCLCPP_INFO(this->get_logger(), "State: %d", state_);
             this->arm();
         }
-        this->arm();
+        RCLCPP_INFO(this->get_logger(), "State: %d", state_);
     }
 
 }
