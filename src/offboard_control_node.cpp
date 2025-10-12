@@ -13,13 +13,52 @@ namespace px4_offboard
             qos_profile,
             std::bind(&OffboardController::vehicle_status_callback, this, std::placeholders::_1));
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
+
+        rclcpp::Rate loop_rate(3.0);
+        loop_rate.sleep(); 
+
         if (!vehicle_command_client_->wait_for_service(1s)) {
             RCLCPP_WARN(get_logger(), "Service not available");
         }
         else{
             RCLCPP_INFO(this->get_logger(), GREEN("Service is ready"));
         }
+
+        trajectory_pub_ = this->create_publisher<TrajectorySetpointMessage>("/fmu/in/trajectory_setpoint", 10);
+        offboard_mode_pub_ = this->create_publisher<OffboardControlModeMessage>("fmu/in/offboard_control_mode", 10);
+
+        timer_ = this->create_wall_timer(500ms, std::bind(&OffboardController::publish_offboard_control_mode, this));
     }
+
+    void OffboardController::switch_to_offboard_mode(){
+        RCLCPP_INFO(this->get_logger(), "requesting switch to Offboard mode");
+        request_vehicle_command(VehicleCommandMessage::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+    }
+
+    void OffboardController::publish_trajectory_setpoint(float x, float y, float z, float yaw)
+    {
+        TrajectorySetpointMessage msg{};
+        msg.position = {x, y, z};
+        msg.yaw = yaw;
+        msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+        trajectory_pub_->publish(msg);
+    }
+
+
+    void OffboardController::publish_offboard_control_mode()
+    {
+        OffboardControlModeMessage msg{};
+        msg.position = true;
+        msg.velocity = false;
+        msg.acceleration = false;
+        msg.attitude = false;
+        msg.body_rate = false;
+        msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+        offboard_mode_pub_->publish(msg);
+
+        this->run();
+    }
+
 
     void OffboardController::arm()
     {
@@ -30,7 +69,11 @@ namespace px4_offboard
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
     {
-        RCLCPP_INFO(this->get_logger(), "State: %d", state_);
+        RCLCPP_INFO(this->get_logger(), "State: %d", msg->arming_state);
+        RCLCPP_INFO(this->get_logger(), "state_: %d", state_);
+
+        this->pre_flight_checks_pass_ = msg->pre_flight_checks_pass;
+
         switch (msg->arming_state)
         {
             case px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED:
@@ -42,6 +85,26 @@ namespace px4_offboard
             default:
                 this->state_ = State::pre_flight;
                 break;
+        }
+
+        switch (msg->nav_state)
+        {
+            case px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_MANUAL:
+                nav_state_ = NavState::manual;
+                break;
+            case px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_ALTCTL:
+                nav_state_ = NavState::altitude;
+                break;
+            case px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_POSCTL:
+                nav_state_ = NavState::position;
+                break;
+            case px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD:
+                nav_state_ = NavState::offboard;
+                break;
+            default:
+                nav_state_ = NavState::manual;
+                break;
+
         }
     }
 
@@ -68,10 +131,7 @@ namespace px4_offboard
 	
     void OffboardController::response_callback(VehicleCommandSharedFuture future)
     {
-        RCLCPP_INFO(this->get_logger(), "Response callback Send starting ...");
         auto response = future.get();
-        RCLCPP_INFO(this->get_logger(), "VehicleCommand response received!");
-
         switch (response->reply.result)
         {
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED:
@@ -80,8 +140,10 @@ namespace px4_offboard
                 break;
 
             case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
-            case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_DENIED:
                 RCLCPP_WARN(this->get_logger(), "Command temporarily rejected");
+                break;
+            case px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_DENIED:
+                RCLCPP_WARN(this->get_logger(), "Command denied");
                 break;
 
             default:
@@ -94,14 +156,36 @@ namespace px4_offboard
 
     void OffboardController::run()
     {
-        RCLCPP_INFO(this->get_logger(), "Trying to Arm");
-        while(this->state_ != 1 && !arming_requested_)
-        {
-            RCLCPP_INFO(this->get_logger(), "State: %d", state_);
-            this->arm();
+        if(this->pre_flight_checks_pass_)
+        {   
+            RCLCPP_INFO(this->get_logger(), "Pre flight check: %u", pre_flight_checks_pass_);
+            
+            if(this->nav_state_ != NavState::offboard)
+            {
+                RCLCPP_WARN(this->get_logger(), "Navigation state: %d", this->nav_state_);
+                this->switch_to_offboard_mode();
+            }
+
+            else if(this->nav_state_ == NavState::offboard && this->state_ != State::armed)
+            {
+                RCLCPP_WARN(this->get_logger(), "State: %d", this->state_);
+                this->arm();
+                this->publish_trajectory_setpoint(0.0, 0.0, 0.0, -3.14); 
+            }
+
+            else if(this->state_ == State::armed)
+            {
+                RCLCPP_INFO(this->get_logger(), "Armed");
+            }
         }
-        RCLCPP_INFO(this->get_logger(), "State: %d", state_);
+
+        else
+        {
+            RCLCPP_WARN(this->get_logger(), "Pre flight check not passed");
+        }
+        
     }
+    
 
 }
 
@@ -111,7 +195,6 @@ int main(int argc, char *argv[])
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 	rclcpp::init(argc, argv);
 	auto node = std::make_shared<px4_offboard::OffboardController>("offboard_control");
-    node->run();
     rclcpp::spin(node);
 	rclcpp::shutdown();
 	return 0;
