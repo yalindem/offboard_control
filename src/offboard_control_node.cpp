@@ -69,9 +69,6 @@ namespace px4_offboard
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
     {
-        RCLCPP_INFO(this->get_logger(), "State: %d", msg->arming_state);
-        RCLCPP_INFO(this->get_logger(), "state_: %d", state_);
-
         this->pre_flight_checks_pass_ = msg->pre_flight_checks_pass;
 
         switch (msg->arming_state)
@@ -157,32 +154,39 @@ namespace px4_offboard
     void OffboardController::run()
     {
         if(this->pre_flight_checks_pass_)
-        {   
-            RCLCPP_INFO(this->get_logger(), "Pre flight check: %u", pre_flight_checks_pass_);
-            
+        {  
             if(this->nav_state_ != NavState::offboard)
             {
                 RCLCPP_WARN(this->get_logger(), "Navigation state: %d", this->nav_state_);
                 this->switch_to_offboard_mode();
             }
 
-            else if(this->nav_state_ == NavState::offboard && this->state_ != State::armed)
+            else if(this->nav_state_ == NavState::offboard && this->state_ != State::armed && this->is_armed_ == false)
             {
                 RCLCPP_WARN(this->get_logger(), "State: %d", this->state_);
                 this->arm();
                 this->publish_trajectory_setpoint(0.0, 0.0, 0.0, -3.14); 
             }
 
-            else if(this->state_ == State::armed)
+            else if(this->state_ == State::armed && this->is_armed_ == false)
             {
                 RCLCPP_INFO(this->get_logger(), "Armed");
+                this->is_armed_ = true;
             }
+
+            if(this->state_ == State::armed && this->is_armed_)
+            {
+                this->publish_trajectory_setpoint(0.0, 0.0, -5.0, -3.14); 
+            }
+
         }
 
         else
         {
             RCLCPP_WARN(this->get_logger(), "Pre flight check not passed");
         }
+
+        
         
     }
     

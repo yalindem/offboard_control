@@ -71,6 +71,7 @@ namespace px4_offboard
             rclcpp::TimerBase::SharedPtr timer_;
 
             bool pre_flight_checks_pass_{false};
+            bool is_armed_{false};
     };
 
 }
