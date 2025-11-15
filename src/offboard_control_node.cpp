@@ -78,7 +78,7 @@ namespace px4_offboard
     float OffboardController::calculate_barometric_height(const float pressure, const float temp)
     {
         float T = (initial_temp_ + temp) / 2.0;
-        return ((287.05 / 9.80665)  * T * std::log10(this->initial_pressure_ / pressure));
+        return ((287.05 / 9.80665)  * T * std::log(this->initial_pressure_ / pressure));
     }
 
     void OffboardController::vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg)
@@ -89,8 +89,9 @@ namespace px4_offboard
             this->initial_temp_ = msg->temperature;
             this->is_baro_ready_ = true;
         }
-        
+
         barometric_height_ = calculate_barometric_height(msg->pressure*0.01, msg->temperature);
+        RCLCPP_INFO(this->get_logger(), "barometric_height: %f", barometric_height_);
     }
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
