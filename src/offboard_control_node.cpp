@@ -20,6 +20,11 @@ namespace px4_offboard
             qos_profile,
             std::bind(&OffboardController::vehicle_sensor_barometer_callback, this, std::placeholders::_1));
 
+        vehicle_sensor_imu_sub_ = this->create_subscription<SensorCombinedMessage>(
+            "/fmu/out/sensor_combined", 
+            qos_profile,
+            std::bind(&OffboardController::sensor_combined_callback, this, std::placeholders::_1));
+        
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
 
         rclcpp::Rate loop_rate(3.0);
@@ -92,6 +97,11 @@ namespace px4_offboard
 
         barometric_height_ = calculate_barometric_height(msg->pressure*0.01, msg->temperature);
         RCLCPP_INFO(this->get_logger(), "barometric_height: %f", barometric_height_);
+    }
+
+    void OffboardController::sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg)
+    {
+
     }
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)

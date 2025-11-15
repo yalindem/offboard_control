@@ -12,6 +12,7 @@
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/sensor_baro.hpp"
+#include "px4_msgs/msg/sensor_combined.hpp"
 
 using VehicleCommandSrv = px4_msgs::srv::VehicleCommand;
 using VehicleCommandClient = rclcpp::Client<VehicleCommandSrv>;
@@ -27,6 +28,8 @@ using OffboardControlModeMessage = px4_msgs::msg::OffboardControlMode;
 using OffboardControlModePublisher = rclcpp::Publisher<OffboardControlModeMessage>::SharedPtr;
 using VehicleSensorBarometerMessage = px4_msgs::msg::SensorBaro;
 using VehicleSensorBarometerSubscriber = rclcpp::Subscription<VehicleSensorBarometerMessage>::SharedPtr;
+using SensorCombinedMessage = px4_msgs::msg::SensorCombined;
+using SensorCombinedSubscriber = rclcpp::Subscription<SensorCombinedMessage>::SharedPtr;
 
 enum State {
     pre_flight = 0,
@@ -57,17 +60,19 @@ namespace px4_offboard
             VehicleCommandSharedPtr vehicle_command_client_;
             void arm();
             void request_vehicle_command(std::uint16_t command, float param1 = 0.0, float param2 = 0.0);
-	        void response_callback(VehicleCommandSharedFuture future);
-            void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
+            float calculate_barometric_height(const float pressure, const float temp);
             void switch_to_offboard_mode();
             void publish_trajectory_setpoint(float x, float y, float z, float yaw);
             void publish_offboard_control_mode();
+
+            void response_callback(VehicleCommandSharedFuture future);
             void vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg);
-            float calculate_barometric_height(const float pressure, const float temp);
-            float convert_to_kelvin(const float temp);
+            void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
+            void sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg);
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
             VehicleSensorBarometerSubscriber vehicle_sensor_baro_sub_;
+            SensorCombinedSubscriber vehicle_sensor_imu_sub_;
 
             bool arming_requested_{false};
 
