@@ -3,6 +3,8 @@
 
 using namespace std::chrono_literals;
 
+constexpr double BARO_CONST = 29.27;
+
 namespace px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
@@ -12,6 +14,12 @@ namespace px4_offboard
             "/fmu/out/vehicle_status_v1", 
             qos_profile,
             std::bind(&OffboardController::vehicle_status_callback, this, std::placeholders::_1));
+
+        vehicle_sensor_baro_sub_ = this->create_subscription<VehicleSensorBarometerMessage>(
+            "/fmu/out/sensor_baro", 
+            qos_profile,
+            std::bind(&OffboardController::vehicle_sensor_barometer_callback, this, std::placeholders::_1));
+
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
 
         rclcpp::Rate loop_rate(3.0);
@@ -67,9 +75,32 @@ namespace px4_offboard
         this->arming_requested_ = true;
     }
 
+    float OffboardController::calculate_barometric_height(const float pressure, const float temp)
+    {
+        float T = (initial_temp_ + temp) / 2.0;
+        return ((287.05 / 9.80665)  * T * std::log10(this->initial_pressure_ / pressure));
+    }
+
+    void OffboardController::vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg)
+    {
+        if (!this->is_baro_ready_)
+        {
+            this->initial_pressure_ = msg->pressure*0.01;
+            this->initial_temp_ = msg->temperature;
+            this->is_baro_ready_ = true;
+        }
+        
+        barometric_height_ = calculate_barometric_height(msg->pressure*0.01, msg->temperature);
+    }
+
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
     {
         this->pre_flight_checks_pass_ = msg->pre_flight_checks_pass;
+
+        if(this->is_baro_ready_ == false)
+        {
+            this->pre_flight_checks_pass_ = false;
+        }
 
         switch (msg->arming_state)
         {

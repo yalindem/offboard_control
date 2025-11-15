@@ -3,6 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <chrono>
+#include <cmath>
 
 #include "px4_msgs/srv/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -10,6 +11,7 @@
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
+#include "px4_msgs/msg/sensor_baro.hpp"
 
 using VehicleCommandSrv = px4_msgs::srv::VehicleCommand;
 using VehicleCommandClient = rclcpp::Client<VehicleCommandSrv>;
@@ -23,6 +25,8 @@ using TrajectorySetpointMessage = px4_msgs::msg::TrajectorySetpoint;
 using TrajectorySetpointPublisher = rclcpp::Publisher<TrajectorySetpointMessage>::SharedPtr;
 using OffboardControlModeMessage = px4_msgs::msg::OffboardControlMode;
 using OffboardControlModePublisher = rclcpp::Publisher<OffboardControlModeMessage>::SharedPtr;
+using VehicleSensorBarometerMessage = px4_msgs::msg::SensorBaro;
+using VehicleSensorBarometerSubscriber = rclcpp::Subscription<VehicleSensorBarometerMessage>::SharedPtr;
 
 enum State {
     pre_flight = 0,
@@ -58,8 +62,13 @@ namespace px4_offboard
             void switch_to_offboard_mode();
             void publish_trajectory_setpoint(float x, float y, float z, float yaw);
             void publish_offboard_control_mode();
+            void vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg);
+            float calculate_barometric_height(const float pressure, const float temp);
+            float convert_to_kelvin(const float temp);
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
+            VehicleSensorBarometerSubscriber vehicle_sensor_baro_sub_;
+
             bool arming_requested_{false};
 
             State state_ {State::pre_flight};
@@ -72,6 +81,11 @@ namespace px4_offboard
 
             bool pre_flight_checks_pass_{false};
             bool is_armed_{false};
+            bool is_baro_ready_{false};
+
+            float barometric_height_ {0.0f};
+            float initial_pressure_ {-1.0f};
+            float initial_temp_ {0.0f};
     };
 
 }
