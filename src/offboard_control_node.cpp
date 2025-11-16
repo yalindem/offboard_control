@@ -4,7 +4,7 @@
 using namespace std::chrono_literals;
 
 constexpr double BARO_CONST = 29.27;
-constexpr float GRAVITY_Z_ = 9.80665;
+constexpr float GRAVITY_Z_ = -9.80665;
 
 namespace px4_offboard
 {
@@ -118,18 +118,17 @@ namespace px4_offboard
 
     void OffboardController::sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg)
     {
-        //auto now = this->get_clock()->now();
-        //auto delta_t = (now.seconds() - prev_imu_time_.seconds());
-        float delta_t = (msg->accelerometer_integral_dt/1000000);
+        auto delta_t = 0.01;
         float speicif_force = msg->accelerometer_m_s2[2] - GRAVITY_Z_;
-        
+        std::cout << "delta_t: " << delta_t << std::endl;
+        std::cout << "speicif_force: " << speicif_force << std::endl;
         imu_velo_z_ += speicif_force * delta_t;
-        imu_height_ += imu_velo_z_ * delta_t;
+        std::cout << "imu_velo_z_: " << imu_velo_z_ << std::endl;
+        imu_height_ += delta_t * imu_velo_z_ + 0.5 * delta_t * delta_t * speicif_force;
         std::cout << "imu_height_: " << imu_height_ << std::endl;
 
         //height_estimator_->update_state(barometric_height_, imu_height_, imu_velo_z_);
 
-        //prev_imu_time_ = now;
     }
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
