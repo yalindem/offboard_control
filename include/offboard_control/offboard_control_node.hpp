@@ -13,6 +13,9 @@
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/sensor_baro.hpp"
 #include "px4_msgs/msg/sensor_combined.hpp"
+#include <px4_msgs/msg/sensor_gps.hpp>
+
+#include "height_estimator.hpp"
 
 using VehicleCommandSrv = px4_msgs::srv::VehicleCommand;
 using VehicleCommandClient = rclcpp::Client<VehicleCommandSrv>;
@@ -30,6 +33,8 @@ using VehicleSensorBarometerMessage = px4_msgs::msg::SensorBaro;
 using VehicleSensorBarometerSubscriber = rclcpp::Subscription<VehicleSensorBarometerMessage>::SharedPtr;
 using SensorCombinedMessage = px4_msgs::msg::SensorCombined;
 using SensorCombinedSubscriber = rclcpp::Subscription<SensorCombinedMessage>::SharedPtr;
+using VehicleSensorGPSMessage = px4_msgs::msg::SensorGps;
+using VehicleSensorGPSSubscriber = rclcpp::Subscription<VehicleSensorGPSMessage>::SharedPtr;
 
 enum State {
     pre_flight = 0,
@@ -58,6 +63,8 @@ namespace px4_offboard
 
         private:
             VehicleCommandSharedPtr vehicle_command_client_;
+            std::unique_ptr<HeightEstimator> height_estimator_;
+            
             void arm();
             void request_vehicle_command(std::uint16_t command, float param1 = 0.0, float param2 = 0.0);
             float calculate_barometric_height(const float pressure, const float temp);
@@ -69,10 +76,12 @@ namespace px4_offboard
             void vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg);
             void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
             void sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg);
+            void vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg);
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
             VehicleSensorBarometerSubscriber vehicle_sensor_baro_sub_;
             SensorCombinedSubscriber vehicle_sensor_imu_sub_;
+            VehicleSensorGPSSubscriber vehicle_sensor_gps_sub_;
 
             bool arming_requested_{false};
 
@@ -87,10 +96,15 @@ namespace px4_offboard
             bool pre_flight_checks_pass_{false};
             bool is_armed_{false};
             bool is_baro_ready_{false};
+            bool is_imu_ready {false};
 
             float barometric_height_ {0.0f};
+            float imu_velo_z_;
+            float imu_height_{0.0f};
             float initial_pressure_ {-1.0f};
             float initial_temp_ {0.0f};
+
+            rclcpp::Time prev_imu_time_;
     };
 
 }

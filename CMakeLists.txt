@@ -9,9 +9,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
 
+add_library(height_estimator SHARED src/height_estimator.cpp)
+
 add_executable(offboard_control_node src/offboard_control_node.cpp)
 add_executable(sensor_combined_listener_node src/sensor_combined_listener.cpp)
 add_executable(advertiser_node src/advertiser.cpp)
+
+target_link_libraries(offboard_control_node
+  height_estimator
+)
 
 ament_target_dependencies(offboard_control_node
   rclcpp

@@ -4,11 +4,14 @@
 using namespace std::chrono_literals;
 
 constexpr double BARO_CONST = 29.27;
+constexpr float GRAVITY_Z_ = 9.80665;
 
 namespace px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
+        height_estimator_ = std::make_unique<HeightEstimator>();
+
         rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort(); 
         vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
             "/fmu/out/vehicle_status_v1", 
@@ -25,6 +28,11 @@ namespace px4_offboard
             qos_profile,
             std::bind(&OffboardController::sensor_combined_callback, this, std::placeholders::_1));
         
+        vehicle_sensor_gps_sub_ = this->create_subscription<px4_msgs::msg::SensorGps>(
+            "/fmu/out/vehicle_gps_position", 
+            qos_profile,
+            std::bind(&OffboardController::vehicle_sensor_gps_callback, this, std::placeholders::_1));
+            
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
 
         rclcpp::Rate loop_rate(3.0);
@@ -86,6 +94,15 @@ namespace px4_offboard
         return ((287.05 / 9.80665)  * T * std::log(this->initial_pressure_ / pressure));
     }
 
+    void OffboardController::vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg)
+    {
+        /*
+        std::cout << "latitude_deg: " << msg->latitude_deg  << std::endl;
+        std::cout << "longitude_deg: " << msg->longitude_deg  << std::endl;
+        std::cout << "altitude_msl_m: " << msg->altitude_msl_m  << std::endl;
+        */
+    }
+
     void OffboardController::vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg)
     {
         if (!this->is_baro_ready_)
@@ -101,7 +118,18 @@ namespace px4_offboard
 
     void OffboardController::sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg)
     {
+        //auto now = this->get_clock()->now();
+        //auto delta_t = (now.seconds() - prev_imu_time_.seconds());
+        float delta_t = (msg->accelerometer_integral_dt/1000000);
+        float speicif_force = msg->accelerometer_m_s2[2] - GRAVITY_Z_;
+        
+        imu_velo_z_ += speicif_force * delta_t;
+        imu_height_ += imu_velo_z_ * delta_t;
+        std::cout << "imu_height_: " << imu_height_ << std::endl;
 
+        //height_estimator_->update_state(barometric_height_, imu_height_, imu_velo_z_);
+
+        //prev_imu_time_ = now;
     }
 
     void OffboardController::vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
