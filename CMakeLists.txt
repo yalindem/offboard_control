@@ -14,12 +14,18 @@ add_library(height_estimator SHARED src/height_estimator.cpp)
 add_executable(offboard_control_node src/offboard_control_node.cpp)
 add_executable(sensor_combined_listener_node src/sensor_combined_listener.cpp)
 add_executable(advertiser_node src/advertiser.cpp)
+add_executable(takeoff_node src/takeoff_node.cpp)
 
 target_link_libraries(offboard_control_node
   height_estimator
 )
 
 ament_target_dependencies(offboard_control_node
+  rclcpp
+  px4_msgs
+)
+
+ament_target_dependencies(takeoff_node
   rclcpp
   px4_msgs
 )
@@ -52,6 +58,11 @@ install(PROGRAMS
 
 install(TARGETS
   offboard_control_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS
+  takeoff_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
