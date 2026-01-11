@@ -7,11 +7,18 @@ import sys
 
 agent_process = None
 
-def start_px4(drone_type: str):
+def start_px4(drone_type: str, world: str):
     try:
         os.chdir(os.path.expanduser("~/PX4-Autopilot"))
         print("Building and starting PX4 SITL...")
-        subprocess.Popen(["make", "px4_sitl", drone_type])
+        if world == None:
+            command = ["make", "px4_sitl", drone_type]
+            print(f"command: {command}")
+            subprocess.Popen(command)
+        else:
+            command = f"PX4_GZ_WORLD={world} make px4_sitl {drone_type}"
+            subprocess.Popen(command, shell=True)
+
     except FileNotFoundError as e:
         print(f"Error: Directory not found - {e}")
     except subprocess.CalledProcessError as e:
@@ -98,7 +105,7 @@ def run(args):
     # Start the processes
     start_qgc()
     time.sleep(1)
-    start_px4(args.drone)
+    start_px4(args.drone, args.world)
     time.sleep(1)
     start_dds()
     time.sleep(1)
@@ -118,6 +125,11 @@ if __name__ == "__main__":
         "--drone", "-d",
         default="gz_x500",
         help="Drone type to use (e.g., gz_iris, gz_x500, gz_standard_vtol). Default: gz_x500"
+    )
+    parser.add_argument(
+        "--world", "-w",
+        default=None,
+        help="Gazebo world name (aruco, baylands, default, forest, frictionless, kthspacelab, lawn, moving_platform, rover, underwater, walls, windy)"
     )
     args = parser.parse_args()
     run(args)
