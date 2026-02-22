@@ -6,11 +6,11 @@ using namespace std::chrono_literals;
 constexpr double BARO_CONST = 29.27;
 constexpr float GRAVITY_Z_ = -9.80665;
 
-namespace px4_offboard
+namespace Drone::px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
-        height_estimator_ = std::make_unique<HeightEstimator>();
+        height_estimator_ = std::make_unique<Estimator::HeightEstimator>();
 
         rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort(); 
         vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
@@ -32,7 +32,12 @@ namespace px4_offboard
             "/fmu/out/vehicle_gps_position", 
             qos_profile,
             std::bind(&OffboardController::vehicle_sensor_gps_callback, this, std::placeholders::_1));
-            
+        
+        vehicle_attitude_sub_ = this->create_subscription<VehicleAttitudeMessage>(
+            "/fmu/out/vehicle_attitude", 
+            qos_profile, 
+            std::bind(&OffboardController::attitude_callback, this, std::placeholders::_1));
+
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
 
         rclcpp::Rate loop_rate(3.0);
@@ -114,6 +119,12 @@ namespace px4_offboard
 
         barometric_height_ = calculate_barometric_height(msg->pressure*0.01, msg->temperature);
         RCLCPP_INFO(this->get_logger(), "barometric_height: %f", barometric_height_);
+    }
+
+    
+    void OffboardController::attitude_callback(const VehicleAttitudeMessage::SharedPtr msg)
+    {
+        this->current_q_ = msg->q;
     }
 
     void OffboardController::sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg)
@@ -267,7 +278,7 @@ int main(int argc, char *argv[])
 	std::cout << "Starting offboard control node..." << std::endl;
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 	rclcpp::init(argc, argv);
-	auto node = std::make_shared<px4_offboard::OffboardController>("offboard_control");
+	auto node = std::make_shared<Drone::px4_offboard::OffboardController>("offboard_control");
     rclcpp::spin(node);
 	rclcpp::shutdown();
 	return 0;

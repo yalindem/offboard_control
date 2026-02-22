@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<robot name="x500_flow">
+
+  <link name="base_link">
+    <visual name="base_link_visual">
+      <origin xyz="0 0 0.025" rpy="0 0 3.14159"/>
+      <geometry>
+        <mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/NXP-HGD-CF.dae"/>
+      </geometry>
+    </visual>
+
+    <visual name="5010_motor_base_0">
+      <origin xyz="0.174 0.174 0.032" rpy="0 0 -0.45"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/5010Base.dae"/></geometry>
+    </visual>
+    <visual name="5010_motor_base_1">
+      <origin xyz="-0.174 0.174 0.032" rpy="0 0 -0.45"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/5010Base.dae"/></geometry>
+    </visual>
+    <visual name="5010_motor_base_2">
+      <origin xyz="0.174 -0.174 0.032" rpy="0 0 -0.45"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/5010Base.dae"/></geometry>
+    </visual>
+    <visual name="5010_motor_base_3">
+      <origin xyz="-0.174 -0.174 0.032" rpy="0 0 -0.45"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/5010Base.dae"/></geometry>
+    </visual>
+  </link>
+
+  <link name="rotor_0">
+    <visual>
+      <origin xyz="-0.022 -0.146 -0.016" rpy="0 0 0"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/1345_prop_ccw.stl" scale="0.84 0.84 0.84"/></geometry>
+    </visual>
+  </link>
+  <joint name="rotor_0_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rotor_0"/>
+    <origin xyz="0.174 -0.174 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="rotor_1">
+    <visual>
+      <origin xyz="-0.022 -0.146 -0.016" rpy="0 0 0"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/1345_prop_ccw.stl" scale="0.84 0.84 0.84"/></geometry>
+    </visual>
+  </link>
+  <joint name="rotor_1_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rotor_1"/>
+    <origin xyz="-0.174 0.174 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="rotor_2">
+    <visual>
+      <origin xyz="-0.022 -0.146 -0.016" rpy="0 0 0"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/1345_prop_cw.stl" scale="0.84 0.84 0.84"/></geometry>
+    </visual>
+  </link>
+  <joint name="rotor_2_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rotor_2"/>
+    <origin xyz="0.174 0.174 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="rotor_3">
+    <visual>
+      <origin xyz="-0.022 -0.146 -0.016" rpy="0 0 0"/>
+      <geometry><mesh filename="file:///home/yalin/PX4-Autopilot/Tools/simulation/gz/models/x500_base/meshes/1345_prop_cw.stl" scale="0.84 0.84 0.84"/></geometry>
+    </visual>
+  </link>
+  <joint name="rotor_3_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rotor_3"/>
+    <origin xyz="-0.174 -0.174 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="lidar_sensor_link">
+    <visual>
+      <geometry><box size="0.02 0.02 0.05"/></geometry>
+      <material name="black"><color rgba="0 0 0 1"/></material>
+    </visual>
+  </link>
+
+  <joint name="lidar_sensor_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_sensor_link"/> <origin xyz="0 0 -0.05" rpy="0 1.57 0"/>
+  </joint>
+
+  <link name="flow_link">
+    <visual>
+      <geometry><box size="0.03 0.03 0.01"/></geometry>
+      <material name="blue"><color rgba="0 0 1 1"/></material>
+    </visual>
+  </link>
+
+  <joint name="optical_flow_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="flow_link"/> <origin xyz="0.03 0 -0.1" rpy="0 0 0"/>
+  </joint>
+
+</robot>

@@ -13,7 +13,9 @@
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/sensor_baro.hpp"
 #include "px4_msgs/msg/sensor_combined.hpp"
+#include "px4_msgs/msg/vehicle_attitude.hpp"
 #include <px4_msgs/msg/sensor_gps.hpp>
+
 
 #include "height_estimator.hpp"
 
@@ -24,7 +26,9 @@ using VehicleCommandSharedFuture = VehicleCommandClient::SharedFuture;
 using VehicleCommandMessage = px4_msgs::msg::VehicleCommand;
 using VehicleCommandMessageAck = px4_msgs::msg::VehicleCommandAck;
 using VehicleStatusMessage = px4_msgs::msg::VehicleStatus;
+using VehicleAttitudeMessage = px4_msgs::msg::VehicleAttitude;
 using VehicleCommandMessageSubscriber = rclcpp::Subscription<VehicleStatusMessage>::SharedPtr;
+using VehicleAttitudeMessageSubscriber = rclcpp::Subscription<VehicleAttitudeMessage>::SharedPtr;
 using TrajectorySetpointMessage = px4_msgs::msg::TrajectorySetpoint;
 using TrajectorySetpointPublisher = rclcpp::Publisher<TrajectorySetpointMessage>::SharedPtr;
 using OffboardControlModeMessage = px4_msgs::msg::OffboardControlMode;
@@ -52,7 +56,7 @@ enum NavState {
 
 #define GREEN(text) "\033[1;32m" text "\033[0m"
 
-namespace px4_offboard
+namespace Drone::px4_offboard
 {
 
     class OffboardController : public rclcpp::Node
@@ -63,7 +67,7 @@ namespace px4_offboard
 
         private:
             VehicleCommandSharedPtr vehicle_command_client_;
-            std::unique_ptr<HeightEstimator> height_estimator_;
+            std::unique_ptr<Estimator::HeightEstimator> height_estimator_;
             
             void arm();
             void request_vehicle_command(std::uint16_t command, float param1 = 0.0, float param2 = 0.0);
@@ -77,11 +81,13 @@ namespace px4_offboard
             void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
             void sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg);
             void vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg);
+            void attitude_callback(const VehicleAttitudeMessage::SharedPtr msg);
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
             VehicleSensorBarometerSubscriber vehicle_sensor_baro_sub_;
             SensorCombinedSubscriber vehicle_sensor_imu_sub_;
             VehicleSensorGPSSubscriber vehicle_sensor_gps_sub_;
+            VehicleAttitudeMessageSubscriber vehicle_attitude_sub_;
 
             bool arming_requested_{false};
 
@@ -103,6 +109,8 @@ namespace px4_offboard
             float imu_height_{0.0f};
             float initial_pressure_ {-1.0f};
             float initial_temp_ {0.0f};
+
+            std::array<float, 4> current_q_;
 
             rclcpp::Time prev_imu_time_;
     };

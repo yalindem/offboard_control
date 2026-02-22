@@ -1,6 +1,6 @@
 #include "offboard_control/height_estimator.hpp"
 
-namespace px4_offboard
+namespace Drone::Estimator
 {
     HeightEstimator::HeightEstimator()
     {

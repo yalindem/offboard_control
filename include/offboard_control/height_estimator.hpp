@@ -2,7 +2,7 @@
 #define CPP_HEIGHT_ESTIMATOR
 #include "iostream"
 
-namespace px4_offboard
+namespace Drone::Estimator
 {
     class HeightEstimator
     {
