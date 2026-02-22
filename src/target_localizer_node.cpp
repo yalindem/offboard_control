@@ -5,32 +5,22 @@ namespace Drone::Localizer
 
     TargetLocalizer::TargetLocalizer() : Node("target_localizer")
     {
+        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+        auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+
         timer_ = this->create_wall_timer(
             std::chrono::seconds(1), std::bind(&TargetLocalizer::transform_target, this));
+        odom_sub_ = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
+            "/fmu/out/vehicle_odometry", qos,
+            std::bind(&TargetLocalizer::odom_callback, this, std::placeholders::_1));
     }
 
     void TargetLocalizer::transform_target()
     {
-        geometry_msgs::msg::PointStamped point_in_cam;
-        point_in_cam.header.frame_id = "flow_link";
-        point_in_cam.header.stamp = this->get_clock()->now();
-        point_in_cam.point.x = 0.0;
-        point_in_cam.point.y = 0.0;
-        point_in_cam.point.z = 3.0;
-
-        geometry_msgs::msg::PointStamped point_in_odom;
-
-        try
-        {
-            auto transform = tf_buffer_->lookupTransform(
-                "odom", "camera_link", tf2::TimePointZero);
-        }
-        catch (const tf2::TransformException & ex)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Dönüşüm hatası: %s", ex.what());
-        }
+        
         
     }
 

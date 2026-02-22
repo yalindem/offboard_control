@@ -10,14 +10,20 @@ namespace Drone::px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
-        height_estimator_ = std::make_unique<Estimator::HeightEstimator>();
+        //height_estimator_ = std::make_unique<Estimator::HeightEstimator>();
 
         rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort(); 
         vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
             "/fmu/out/vehicle_status_v1", 
             qos_profile,
             std::bind(&OffboardController::vehicle_status_callback, this, std::placeholders::_1));
+        
 
+        local_pos_sub_ = this->create_subscription<VehicleLocalPositionMessage>(
+            "/fmu/out/vehicle_local_position_v1", qos_profile,
+            std::bind(&OffboardController::local_position_callback, this, std::placeholders::_1));
+
+        /*
         vehicle_sensor_baro_sub_ = this->create_subscription<VehicleSensorBarometerMessage>(
             "/fmu/out/sensor_baro", 
             qos_profile,
@@ -37,7 +43,7 @@ namespace Drone::px4_offboard
             "/fmu/out/vehicle_attitude", 
             qos_profile, 
             std::bind(&OffboardController::attitude_callback, this, std::placeholders::_1));
-
+        */
         this->vehicle_command_client_ = this->create_client<VehicleCommandSrv>("/fmu/vehicle_command");
 
         rclcpp::Rate loop_rate(3.0);
@@ -54,6 +60,8 @@ namespace Drone::px4_offboard
         offboard_mode_pub_ = this->create_publisher<OffboardControlModeMessage>("fmu/in/offboard_control_mode", 10);
 
         timer_ = this->create_wall_timer(500ms, std::bind(&OffboardController::publish_offboard_control_mode, this));
+
+        this->create_waypoints();
     }
 
     void OffboardController::switch_to_offboard_mode(){
@@ -146,10 +154,10 @@ namespace Drone::px4_offboard
     {
         this->pre_flight_checks_pass_ = msg->pre_flight_checks_pass;
 
-        if(this->is_baro_ready_ == false)
-        {
-            this->pre_flight_checks_pass_ = false;
-        }
+        //if(this->is_baro_ready_ == false)
+        //{
+        //    this->pre_flight_checks_pass_ = false;
+        //}
 
         switch (msg->arming_state)
         {
@@ -240,14 +248,12 @@ namespace Drone::px4_offboard
                 RCLCPP_WARN(this->get_logger(), "Navigation state: %d", this->nav_state_);
                 this->switch_to_offboard_mode();
             }
-
             else if(this->nav_state_ == NavState::offboard && this->state_ != State::armed && this->is_armed_ == false)
             {
                 RCLCPP_WARN(this->get_logger(), "State: %d", this->state_);
                 this->arm();
                 this->publish_trajectory_setpoint(0.0, 0.0, 0.0, -3.14); 
             }
-
             else if(this->state_ == State::armed && this->is_armed_ == false)
             {
                 RCLCPP_INFO(this->get_logger(), "Armed");
@@ -256,22 +262,81 @@ namespace Drone::px4_offboard
 
             if(this->state_ == State::armed && this->is_armed_)
             {
-                this->publish_trajectory_setpoint(0.0, 0.0, -5.0, -3.14); 
+                if (!waypoints.empty()) 
+                {
+                    auto& target = waypoints.front();
+
+                    if (is_waypoint_reached(target)) 
+                    {
+                        waypoints.pop();
+
+                        if (!waypoints.empty()) 
+                        {
+                            auto& next = waypoints.front();
+                            RCLCPP_INFO(this->get_logger(), "Sıradaki Hedef: X:%.2f Y:%.2f Z:%.2f", next.x, next.y, next.z);
+                        } 
+                        else 
+                        {
+                            RCLCPP_INFO(this->get_logger(), "TÜM GÖREVLER BİTTİ. HOVER MODUNA GEÇİLDİ.");
+                        }
+                    }
+
+                    if (!waypoints.empty())
+                    {
+                        auto& current_target = waypoints.front();
+                        this->publish_trajectory_setpoint(current_target.x, current_target.y, current_target.z, current_target.yaw);
+                    }
+                }
+                else 
+                {
+                    this->publish_trajectory_setpoint(current_x_, current_y_, current_z_, current_yaw_);
+                }
             }
-
         }
-
         else
         {
             RCLCPP_WARN(this->get_logger(), "Pre flight check not passed");
         }
-
-        
-        
     }
+
+    void OffboardController::local_position_callback(const VehicleLocalPositionMessage::SharedPtr msg) 
+    {   
+        /*
+        # Position in local NED frame
+        float32 x				# North position in NED earth-fixed frame, (metres)
+        float32 y				# East position in NED earth-fixed frame, (metres)
+        float32 z				# Down position (negative altitude) in NED earth-fixed frame, (metres)
+        */
+        current_x_ = msg->x;
+        current_y_ = msg->y;
+        current_z_ = msg->z;
+    }
+
+    bool OffboardController::is_waypoint_reached(const Waypoint& w)
+    {
+        float distance = sqrt( (w.x - current_x_) * (w.x - current_x_) + (w.y - current_y_) * (w.y - current_y_) + (w.z - current_z_) * (w.z - current_z_) );
+        return distance < 0.5 ? true : false;
+    }
+
     
 
+    void OffboardController::create_waypoints()
+    {
+        Waypoint w0(0.0f, 0.0f, -5.0f, -1.56f);
+        Waypoint w1(0.0f, 5.0f, -5.0f, -3.14f);
+        Waypoint w2(-1.0f, -5.0f, -5.0f, -1.56f);
+        Waypoint w3(-2.0f, 2.0f, -5.0f, 0.0f);
+        Waypoint w4(-1.0f, 0.0f, -5.0f, 1.56f);
+
+        this->waypoints.push(w0);
+        this->waypoints.push(w1);
+        this->waypoints.push(w2);
+        this->waypoints.push(w3);
+        this->waypoints.push(w4);
+    }
 }
+
+
 
 int main(int argc, char *argv[])
 {

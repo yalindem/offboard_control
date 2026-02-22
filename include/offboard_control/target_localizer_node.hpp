@@ -28,6 +28,7 @@ namespace Drone::Localizer
             std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
             std::unique_ptr<tf2_ros::Buffer> tf_buffer_{nullptr};
             std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+            rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub_;
             //rclcpp::TimerBase::SharedPtr timer_{nullptr};
             //tf2_ros::TransformListener::SharedPtr tf_listener_{nullptr};
             

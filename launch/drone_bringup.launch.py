@@ -24,14 +24,19 @@ def generate_launch_description():
             output='screen',
             parameters=[{'robot_description': robot_desc}]
         ),
-        
+        Node(
+            package='offboard_control',
+            executable='offboard_control_node',
+            name='offboard_control_node',
+            output='screen'
+        ),
         # Senin yazdığın C++ nodu (Odom -> Base_link yayınlayan)
-        #Node(
-        #    package='offboard_control',
-        #    executable='target_localizer_node', # C++ dosyanın executable adı
-        #    name='target_localizer',
-        #    output='screen'
-        #),
+        Node(
+            package='offboard_control',
+            executable='target_localizer_node', # C++ dosyanın executable adı
+            name='target_localizer',
+            output='screen'
+        ),
         
         # Statik Transform: map -> odom (Harita ve kalkış noktası aynı kabul edilir)
         Node(

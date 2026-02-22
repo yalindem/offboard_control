@@ -5,131 +5,134 @@ import time
 import signal
 import sys
 
+# Global süreç değişkenleri
 agent_process = None
+px4_process = None
+qgc_process = None
+ros_process = None
 
 def start_px4(drone_type: str, world: str):
+    global px4_process
     try:
         os.chdir(os.path.expanduser("~/PX4-Autopilot"))
-        print("Building and starting PX4 SITL...")
-        if world == None:
-            command = ["make", "px4_sitl", drone_type]
-            print(f"command: {command}")
-            subprocess.Popen(command)
+        print("--- [1/4] PX4 SITL Başlatılıyor... ---")
+        
+        if world is None:
+            command = f"make px4_sitl {drone_type}"
         else:
             command = f"PX4_GZ_WORLD={world} make px4_sitl {drone_type}"
-            subprocess.Popen(command, shell=True)
-
-    except FileNotFoundError as e:
-        print(f"Error: Directory not found - {e}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Command failed - {e}")
+        
+        # Süreç grubunu (process group) yönetebilmek için start_new_session=True kullanıyoruz
+        px4_process = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
+        print(f"PX4 Komutu: {command}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
+        print(f"PX4 başlatılırken hata: {e}")
 
 def start_dds():
     global agent_process
     try:
-        os.chdir(os.path.expanduser("~/Micro-XRCE-DDS-Agent"))
-        print("Starting MicroXRCEAgent...")
-        agent_process = subprocess.Popen(["MicroXRCEAgent", "udp4", "-p", "8888"])
-        print(f"MicroXRCEAgent started with PID: {agent_process.pid}")
-    except FileNotFoundError as e:
-        print(f"Error: Directory not found - {e}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Command failed - {e}")
+        print("--- [2/4] MicroXRCEAgent Başlatılıyor... ---")
+        # Agent genelde path'e ekli olduğu için direkt çağrılabilir
+        agent_process = subprocess.Popen(
+            ["MicroXRCEAgent", "udp4", "-p", "8888"], 
+            preexec_fn=os.setsid
+        )
+        print(f"MicroXRCEAgent PID: {agent_process.pid}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
+        print(f"DDS Agent başlatılırken hata: {e}")
 
 def start_qgc():
+    global qgc_process
     try:
-        print("Starting QGroundControl...")
-        qgc_process = subprocess.Popen(["qgc"])
-    except FileNotFoundError as e:
-        print(f"Error: Directory not found - {e}")
+        print("--- [3/4] QGroundControl Başlatılıyor... ---")
+        # Sisteminizde 'qgc' komutu tanımlı değilse tam yolunu yazmalısınız
+        qgc_process = subprocess.Popen(["qgc"], preexec_fn=os.setsid)
     except Exception as e:
-        print(f"An unexpected error occurred while starting QGC: {e}")
+        print(f"QGC başlatılamadı (Yolun doğru olduğundan emin olun): {e}")
 
-def get_process_id(process_name):
+def start_ros_launch():
+    global ros_process
     try:
-        pid_output = subprocess.check_output(
-            ["pgrep", "-f", process_name],
-            text=True,
-            stderr=subprocess.PIPE
-        ).strip()
-        if pid_output:
-            return pid_output.split()[0]
-        else:
-            return None
-    except subprocess.CalledProcessError as e:
-        if e.returncode == 1:
-            return None
-        else:
-            raise
-
-
-def kill_process_by_id(id: str):
-    if id:
-        print(f"Terminating process with PID: {id}")
-        try:
-            subprocess.run(["kill", "-9", id], check=True)
-            print(f"Process {id} successfully killed.")
-        except subprocess.CalledProcessError as e:
-            print(f"Error killing process {id}: {e}")
-        except Exception as e:
-            print(f"An unexpected error occurred while killing process: {e}")
-    else:
-        print("No process ID provided to kill.")
-
+        print("--- [4/4] ROS2 Launch Başlatılıyor... ---")
+        # Önce workspace'i source eder, sonra launch komutunu çalıştırır
+        command = "source ~/workspace/ros_ws/install/setup.bash && ros2 launch offboard_control drone_bringup.launch.py"
+        
+        # executable='/bin/bash' ekliyoruz çünkü 'source' bir bash komutudur
+        ros_process = subprocess.Popen(
+            command, 
+            shell=True, 
+            executable='/bin/bash', 
+            preexec_fn=os.setsid
+        )
+    except Exception as e:
+        print(f"ROS2 Launch error: {e}")
 def signal_handler(sig, frame):
-    print('\n\nCtrl+C (SIGINT) received. Initiating graceful shutdown...')
-    global agent_process
+    print('\n\n' + '!'*20)
+    print("Kapatma sinyali alındı. Tüm süreçler sonlandırılıyor...")
+    
+    # Başlattığımız tüm süreçleri gruplarıyla beraber öldürüyoruz
+    processes = {
+        "ROS2": ros_process,
+        "DDS Agent": agent_process,
+        "PX4": px4_process,
+        "QGC": qgc_process
+    }
 
-    if agent_process and agent_process.poll() is None:
-        print(f"Killing MicroXRCEAgent (PID: {agent_process.pid}) started by this script...")
-        agent_process.kill()
-    else:
-        dds_pid = get_process_id("MicroXRCEAgent")
-        if dds_pid:
-            kill_process_by_id(dds_pid)
-        else:
-            print("MicroXRCEAgent process not found or already terminated.")
+    for name, proc in processes.items():
+        if proc and proc.poll() is None:
+            try:
+                print(f"{name} sonlandırılıyor...")
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except Exception as e:
+                print(f"{name} kapatılırken hata: {e}")
 
+    print("Temizlik tamamlandı. Çıkış yapılıyor.")
     sys.exit(0)
 
-
 def run(args):
+    # Ctrl+C yakalayıcı
     signal.signal(signal.SIGINT, signal_handler)
 
-    # Start the processes
+    # 1. QGroundControl (Opsiyonel, en başta açılması iyidir)
     start_qgc()
-    time.sleep(1)
-    start_px4(args.drone, args.world)
-    time.sleep(1)
-    start_dds()
-    time.sleep(1)
+    time.sleep(2)
 
-    print("\nPress Ctrl+C to terminate all processes and exit.")
+    # 2. PX4 SITL (Gazebo ile birlikte)
+    start_px4(args.drone, args.world)
+    # Gazebo'nun yüklenmesi ve PX4'ün initialize olması için uzunca bekleme
+    print("Gazebo ve PX4'ün açılması bekleniyor (10sn)...")
+    time.sleep(10)
+
+    # 3. DDS Agent (PX4 ile ROS2 arasındaki köprü)
+    start_dds()
+    time.sleep(15)
+
+    # 4. ROS2 Nodes (Senin yazdığın kontrol kodu)
+    start_ros_launch()
+
+    print("\n" + "="*40)
+    print("TÜM SİSTEMLER ÇALIŞIYOR")
+    print("Durdurmak için: CTRL+C")
+    print("="*40)
+
     try:
         while True:
-            time.sleep(0.5)
+            time.sleep(1)
     except KeyboardInterrupt:
-        # This block is theoretically unreachable because the signal handler exits the script.
         pass
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Start PX4 SITL with specified drone type.")
+    parser = argparse.ArgumentParser(description="PX4 SITL ve ROS2 Otomasyonu")
     parser.add_argument(
         "--drone", "-d",
         default="gz_x500",
-        help="Drone type to use (e.g., gz_iris, gz_x500, gz_standard_vtol). Default: gz_x500"
+        help="Drone tipi (Örn: gz_x500, gz_iris). Varsayılan: gz_x500"
     )
     parser.add_argument(
         "--world", "-w",
         default=None,
-        help="Gazebo world name (aruco, baylands, default, forest, frictionless, kthspacelab, lawn, moving_platform, rover, underwater, walls, windy)"
+        help="Gazebo dünyası (Örn: baylands, khtspacelab vb.)"
     )
+    
     args = parser.parse_args()
     run(args)

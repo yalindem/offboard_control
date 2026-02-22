@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <chrono>
 #include <cmath>
+#include <queue>
 
 #include "px4_msgs/srv/vehicle_command.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -14,6 +15,7 @@
 #include "px4_msgs/msg/sensor_baro.hpp"
 #include "px4_msgs/msg/sensor_combined.hpp"
 #include "px4_msgs/msg/vehicle_attitude.hpp"
+#include "px4_msgs/msg/vehicle_local_position.hpp"
 #include <px4_msgs/msg/sensor_gps.hpp>
 
 
@@ -39,6 +41,8 @@ using SensorCombinedMessage = px4_msgs::msg::SensorCombined;
 using SensorCombinedSubscriber = rclcpp::Subscription<SensorCombinedMessage>::SharedPtr;
 using VehicleSensorGPSMessage = px4_msgs::msg::SensorGps;
 using VehicleSensorGPSSubscriber = rclcpp::Subscription<VehicleSensorGPSMessage>::SharedPtr;
+using VehicleLocalPositionMessage = px4_msgs::msg::VehicleLocalPosition;
+using VehicleLocalPositionSubscriber = rclcpp::Subscription<VehicleLocalPositionMessage>::SharedPtr;
 
 enum State {
     pre_flight = 0,
@@ -52,6 +56,16 @@ enum NavState {
     altitude = 1,
     position = 2,
     offboard = 14
+};
+
+struct Waypoint
+{
+    float x;
+    float y;
+    float z;
+    float yaw;
+    Waypoint(float x_, float y_, float z_, float yaw_) 
+        : x(x_), y(y_), z(z_), yaw(yaw_) {}
 };
 
 #define GREEN(text) "\033[1;32m" text "\033[0m"
@@ -82,12 +96,18 @@ namespace Drone::px4_offboard
             void sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg);
             void vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg);
             void attitude_callback(const VehicleAttitudeMessage::SharedPtr msg);
+            void local_position_callback(const VehicleLocalPositionMessage::SharedPtr msg);
+            void create_waypoints();
+            bool is_waypoint_reached(const Waypoint& w);
+            //float get_distance();
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
             VehicleSensorBarometerSubscriber vehicle_sensor_baro_sub_;
             SensorCombinedSubscriber vehicle_sensor_imu_sub_;
             VehicleSensorGPSSubscriber vehicle_sensor_gps_sub_;
             VehicleAttitudeMessageSubscriber vehicle_attitude_sub_;
+            VehicleLocalPositionSubscriber local_pos_sub_;
+            
 
             bool arming_requested_{false};
 
@@ -110,9 +130,13 @@ namespace Drone::px4_offboard
             float initial_pressure_ {-1.0f};
             float initial_temp_ {0.0f};
 
+            std::queue<Waypoint> waypoints;
+
             std::array<float, 4> current_q_;
 
             rclcpp::Time prev_imu_time_;
+
+            float current_x_{0.0f}, current_y_{0.0f}, current_z_{0.0f}, current_yaw_{0.0};
     };
 
 }
