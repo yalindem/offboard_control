@@ -18,7 +18,7 @@
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include <px4_msgs/msg/sensor_gps.hpp>
 
-
+#include "fast_median_filter.hpp"
 #include "height_estimator.hpp"
 
 using VehicleCommandSrv = px4_msgs::srv::VehicleCommand;
@@ -126,6 +126,8 @@ namespace Drone::px4_offboard
             bool is_baro_ready_{false};
             bool is_imu_ready {false};
 
+            std::shared_ptr<FastMedianFilter<15> > baro_filter_;
+            float last_filtered_height_ = 0.0f;
             float barometric_height_ {0.0f};
             float imu_velo_z_;
             float imu_height_{0.0f};
@@ -144,7 +146,8 @@ namespace Drone::px4_offboard
             rclcpp::Time prev_imu_time_;
 
             float current_x_{0.0f}, current_y_{0.0f}, current_z_{0.0f}, current_yaw_{0.0};
-            
+
+
     };
 
 }

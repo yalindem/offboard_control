@@ -23,7 +23,8 @@ namespace Drone::px4_offboard
             "/fmu/out/vehicle_local_position_v1", qos_profile,
             std::bind(&OffboardController::local_position_callback, this, std::placeholders::_1));
 
-        
+        baro_filter_ = std::make_shared<Drone::px4_offboard::FastMedianFilter<15>>();
+
         vehicle_sensor_baro_sub_ = this->create_subscription<VehicleSensorBarometerMessage>(
             "/fmu/out/sensor_baro", 
             qos_profile,
@@ -121,20 +122,41 @@ namespace Drone::px4_offboard
     {
         float current_p = msg->pressure * 0.01f; // hPa cinsinden
 
+        // Kalibrasyon (ilk çalıştırma)
         if (!this->is_baro_ready_)
         {
             this->initial_pressure_ = current_p;
             this->initial_temp_ = msg->temperature;
             this->is_baro_ready_ = true;
+            this->last_filtered_height_ = 0.0f;  // Başlangıç değeri
+            
             RCLCPP_INFO(this->get_logger(), "Barometre Sıfırlandı: %.2f hPa", initial_pressure_);
+            return; 
         }
-
-        // FORMÜL: Mevcut basıncı, başlangıç basıncıyla kıyaslayarak yerden yüksekliği bul
-        barometric_height_ = calculate_barometric_height(current_p, msg->temperature);
-        RCLCPP_INFO(this->get_logger(), "barometric_height: %f", barometric_height_);
-        std::cout << "barometric_height: " << barometric_height_ << std::endl;
+        float raw_height = calculate_barometric_height(current_p, msg->temperature);
+        if(baro_filter_->isFilled())
+        {
+            baro_filter_->reset();
+        }
+        float median_height = baro_filter_->update(raw_height);
+        const float alpha = 0.05f;
+        float lowpass_height = alpha * median_height + (1.0f - alpha) * last_filtered_height_;
+        const float dt = 0.02f;
+        const float max_rate = 5.0f * dt;  
+        float delta = lowpass_height - last_filtered_height_;
+        float rate_limited_height;
+        if (std::abs(delta) > max_rate) {
+            rate_limited_height = last_filtered_height_ + std::copysign(max_rate, delta);
+        } else {
+            rate_limited_height = lowpass_height;
+        }
+        
+        barometric_height_ = rate_limited_height;
+        last_filtered_height_ = rate_limited_height;
+        std::cout << "--------------------------------------------------\n";
+        RCLCPP_INFO(this->get_logger(), "barometric_height: %.3f (raw: %.3f, median: %.3f)", 
+                    barometric_height_, raw_height, median_height);
     }
-
     
     void OffboardController::attitude_callback(const VehicleAttitudeMessage::SharedPtr msg)
     {

@@ -13,6 +13,16 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
 add_library(height_estimator SHARED src/height_estimator.cpp)
+add_library(FastMedianFilter INTERFACE)
+
+include_directories(
+  include
+)
+
+target_include_directories(FastMedianFilter INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
 add_executable(offboard_control_node src/offboard_control_node.cpp)
 add_executable(target_localizer_node src/target_localizer_node.cpp)
@@ -21,6 +31,7 @@ add_executable(advertiser_node src/advertiser.cpp)
 add_executable(takeoff_node src/takeoff_node.cpp)
 
 target_link_libraries(offboard_control_node
+  FastMedianFilter
   height_estimator
 )
 
@@ -52,9 +63,6 @@ ament_target_dependencies(advertiser_node
   px4_msgs
 )
 
-include_directories(
-  include
-)
 
 
 install(DIRECTORY
