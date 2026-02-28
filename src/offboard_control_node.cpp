@@ -23,17 +23,17 @@ namespace Drone::px4_offboard
             "/fmu/out/vehicle_local_position_v1", qos_profile,
             std::bind(&OffboardController::local_position_callback, this, std::placeholders::_1));
 
-        /*
+        
         vehicle_sensor_baro_sub_ = this->create_subscription<VehicleSensorBarometerMessage>(
             "/fmu/out/sensor_baro", 
             qos_profile,
             std::bind(&OffboardController::vehicle_sensor_barometer_callback, this, std::placeholders::_1));
-
+        
         vehicle_sensor_imu_sub_ = this->create_subscription<SensorCombinedMessage>(
             "/fmu/out/sensor_combined", 
             qos_profile,
             std::bind(&OffboardController::sensor_combined_callback, this, std::placeholders::_1));
-        
+        /*
         vehicle_sensor_gps_sub_ = this->create_subscription<px4_msgs::msg::SensorGps>(
             "/fmu/out/vehicle_gps_position", 
             qos_profile,
@@ -103,8 +103,9 @@ namespace Drone::px4_offboard
 
     float OffboardController::calculate_barometric_height(const float pressure, const float temp)
     {
-        float T = (initial_temp_ + temp) / 2.0;
-        return ((287.05 / 9.80665)  * T * std::log(this->initial_pressure_ / pressure));
+        float T_kelvin = ((initial_temp_ + temp) / 2.0f) + 273.15f;
+        float gas_constant_factor = 287.05f / 9.80665f;
+        return (gas_constant_factor * T_kelvin * std::log(this->initial_pressure_ / pressure));
     }
 
     void OffboardController::vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg)
@@ -118,15 +119,20 @@ namespace Drone::px4_offboard
 
     void OffboardController::vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg)
     {
+        float current_p = msg->pressure * 0.01f; // hPa cinsinden
+
         if (!this->is_baro_ready_)
         {
-            this->initial_pressure_ = msg->pressure*0.01;
+            this->initial_pressure_ = current_p;
             this->initial_temp_ = msg->temperature;
             this->is_baro_ready_ = true;
+            RCLCPP_INFO(this->get_logger(), "Barometre Sıfırlandı: %.2f hPa", initial_pressure_);
         }
 
-        barometric_height_ = calculate_barometric_height(msg->pressure*0.01, msg->temperature);
+        // FORMÜL: Mevcut basıncı, başlangıç basıncıyla kıyaslayarak yerden yüksekliği bul
+        barometric_height_ = calculate_barometric_height(current_p, msg->temperature);
         RCLCPP_INFO(this->get_logger(), "barometric_height: %f", barometric_height_);
+        std::cout << "barometric_height: " << barometric_height_ << std::endl;
     }
 
     
@@ -137,16 +143,36 @@ namespace Drone::px4_offboard
 
     void OffboardController::sensor_combined_callback(const px4_msgs::msg::SensorCombined::SharedPtr msg)
     {
+        
         auto delta_t = 0.01;
-        float speicif_force = msg->accelerometer_m_s2[2] - GRAVITY_Z_;
-        std::cout << "delta_t: " << delta_t << std::endl;
-        std::cout << "speicif_force: " << speicif_force << std::endl;
-        imu_velo_z_ += speicif_force * delta_t;
-        std::cout << "imu_velo_z_: " << imu_velo_z_ << std::endl;
-        imu_height_ += delta_t * imu_velo_z_ + 0.5 * delta_t * delta_t * speicif_force;
-        std::cout << "imu_height_: " << imu_height_ << std::endl;
+        float beta = 0.2f;
+        float acc_z = msg->accelerometer_m_s2[2] - GRAVITY_Z_;
+        if (is_static_bias_calculated(acc_z) == false) return;
+        acc_z = acc_z - acc_static_bias_;
+        filtered_acc_z_ = (beta * acc_z) + ((1.0f - beta) * filtered_acc_z_);
+        if (std::abs(filtered_acc_z_) < 0.001f) return;
+        imu_velo_z_ += filtered_acc_z_ * delta_t;
+        imu_height_ += (imu_velo_z_ * delta_t) + (0.5f * filtered_acc_z_ * delta_t * delta_t);
+        //std::cout << "imu_height_: " << imu_height_ << std::endl;
 
         //height_estimator_->update_state(barometric_height_, imu_height_, imu_velo_z_);
+    }
+
+    bool OffboardController::is_static_bias_calculated(float acc)
+    {
+        if(acc_bias_counter_< acc_bias_size_)
+        {
+            acc_sum_ += acc;
+            acc_static_bias_ = acc_sum_ / acc_bias_counter_;
+            acc_bias_counter_ += 1;
+            return false;
+        }
+        return true;
+        
+    }
+
+    void OffboardController::estimate_height()
+    {
 
     }
 
@@ -260,6 +286,7 @@ namespace Drone::px4_offboard
                 this->is_armed_ = true;
             }
 
+            /*
             if(this->state_ == State::armed && this->is_armed_)
             {
                 if (!waypoints.empty()) 
@@ -292,6 +319,7 @@ namespace Drone::px4_offboard
                     this->publish_trajectory_setpoint(current_x_, current_y_, current_z_, current_yaw_);
                 }
             }
+            */
         }
         else
         {

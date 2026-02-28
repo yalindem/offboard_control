@@ -89,7 +89,6 @@ namespace Drone::px4_offboard
             void switch_to_offboard_mode();
             void publish_trajectory_setpoint(float x, float y, float z, float yaw);
             void publish_offboard_control_mode();
-
             void response_callback(VehicleCommandSharedFuture future);
             void vehicle_sensor_barometer_callback(const VehicleSensorBarometerMessage::SharedPtr msg);
             void vehicle_status_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);
@@ -97,8 +96,11 @@ namespace Drone::px4_offboard
             void vehicle_sensor_gps_callback(const VehicleSensorGPSMessage::SharedPtr msg);
             void attitude_callback(const VehicleAttitudeMessage::SharedPtr msg);
             void local_position_callback(const VehicleLocalPositionMessage::SharedPtr msg);
+            void estimate_height();
             void create_waypoints();
             bool is_waypoint_reached(const Waypoint& w);
+
+            bool is_static_bias_calculated(float acc);
             //float get_distance();
 
             VehicleCommandMessageSubscriber vehicle_command_sub_;
@@ -129,7 +131,12 @@ namespace Drone::px4_offboard
             float imu_height_{0.0f};
             float initial_pressure_ {-1.0f};
             float initial_temp_ {0.0f};
-
+            float filtered_acc_z_ {0.0f};
+            float height_est_{0.0f};
+            float acc_static_bias_{0.0f};
+            float acc_sum_{0.0f};
+            size_t acc_bias_size_{200};
+            size_t acc_bias_counter_{200};
             std::queue<Waypoint> waypoints;
 
             std::array<float, 4> current_q_;
@@ -137,6 +144,7 @@ namespace Drone::px4_offboard
             rclcpp::Time prev_imu_time_;
 
             float current_x_{0.0f}, current_y_{0.0f}, current_z_{0.0f}, current_yaw_{0.0};
+            
     };
 
 }
