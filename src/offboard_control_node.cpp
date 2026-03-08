@@ -122,13 +122,12 @@ namespace Drone::px4_offboard
     {
         float current_p = msg->pressure * 0.01f; // hPa cinsinden
 
-        // Kalibrasyon (ilk çalıştırma)
         if (!this->is_baro_ready_)
         {
             this->initial_pressure_ = current_p;
             this->initial_temp_ = msg->temperature;
             this->is_baro_ready_ = true;
-            this->last_filtered_height_ = 0.0f;  // Başlangıç değeri
+            this->last_filtered_height_ = 0.0f;  
             
             RCLCPP_INFO(this->get_logger(), "Barometre Sıfırlandı: %.2f hPa", initial_pressure_);
             return; 
