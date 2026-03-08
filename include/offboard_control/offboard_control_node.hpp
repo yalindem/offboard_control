@@ -20,6 +20,7 @@
 
 #include "fast_median_filter.hpp"
 #include "height_estimator.hpp"
+#include "kalman_filter.hpp"
 
 using VehicleCommandSrv = px4_msgs::srv::VehicleCommand;
 using VehicleCommandClient = rclcpp::Client<VehicleCommandSrv>;
