@@ -18,6 +18,8 @@
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include <px4_msgs/msg/sensor_gps.hpp>
 
+#include <std_msgs/msg/float64_multi_array.hpp>
+
 #include "fast_median_filter.hpp"
 #include "height_estimator.hpp"
 #include "kalman_filter.hpp"
@@ -126,9 +128,12 @@ namespace Drone::px4_offboard
             NavState nav_state_ {NavState::manual};
             HeightEstimatorState kf_state_ {HeightEstimatorState::offline};
 
+            // Publisher
             TrajectorySetpointPublisher trajectory_pub_;
             OffboardControlModePublisher offboard_mode_pub_;
+            rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr height_debug_pub_;
 
+            // Timer
             rclcpp::TimerBase::SharedPtr timer_;
 
             bool pre_flight_checks_pass_{false};

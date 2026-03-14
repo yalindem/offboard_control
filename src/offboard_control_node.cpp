@@ -34,6 +34,8 @@ namespace Drone::px4_offboard
             "/fmu/out/sensor_combined", 
             qos_profile,
             std::bind(&OffboardController::sensor_combined_callback, this, std::placeholders::_1));
+
+        height_debug_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("/height_debug", 10);
         /*
         vehicle_sensor_gps_sub_ = this->create_subscription<px4_msgs::msg::SensorGps>(
             "/fmu/out/vehicle_gps_position", 
@@ -182,8 +184,14 @@ namespace Drone::px4_offboard
         imu_height_ += (imu_velo_z_ * delta_t) + (0.5f * filtered_acc_z_ * delta_t * delta_t);
         //std::cout << "imu_height_: " << imu_height_ << std::endl;
 
-        height_estimator_->update_model(imu_height_);
-        std::cout << "Fused height: " << height_estimator_->getHeight() << std::endl;
+        height_estimator_->update_model(filtered_acc_z_);
+        std_msgs::msg::Float64MultiArray debug_msg;
+        debug_msg.data = {
+            height_estimator_->getHeight(),   // [0] fused
+            barometric_height_,               // [1] baro
+            imu_height_                       // [2] imu
+        };
+        height_debug_pub_->publish(debug_msg);
     }
 
     bool OffboardController::is_static_bias_calculated(float acc)

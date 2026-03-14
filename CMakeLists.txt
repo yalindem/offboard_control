@@ -14,6 +14,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(std_msgs REQUIRED)
 
 ############################################################
 # Header-only libraries
@@ -69,6 +70,7 @@ target_link_libraries(offboard_control_node
 ament_target_dependencies(offboard_control_node
   rclcpp
   px4_msgs
+  std_msgs
 )
 
 add_executable(takeoff_node
