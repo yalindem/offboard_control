@@ -176,15 +176,19 @@ namespace Drone::px4_offboard
         auto delta_t = 0.01;
         float beta = 0.2f;
         float acc_z = msg->accelerometer_m_s2[2] - GRAVITY_Z_;
+        float filtered_acc_z = acc_z - height_estimator_->getBias();
+        height_estimator_->update_model(filtered_acc_z_);
+        /*
         if (is_static_bias_calculated(acc_z) == false) return;
         acc_z = acc_z - acc_static_bias_;
         filtered_acc_z_ = (beta * acc_z) + ((1.0f - beta) * filtered_acc_z_);
         if (std::abs(filtered_acc_z_) < 0.001f) return;
-        imu_velo_z_ += filtered_acc_z_ * delta_t;
-        imu_height_ += (imu_velo_z_ * delta_t) + (0.5f * filtered_acc_z_ * delta_t * delta_t);
+        */
+        imu_velo_z_ += acc_z * delta_t;
+        imu_height_ += (imu_velo_z_ * delta_t) + (0.5f * acc_z * delta_t * delta_t);
         //std::cout << "imu_height_: " << imu_height_ << std::endl;
 
-        height_estimator_->update_model(filtered_acc_z_);
+        //height_estimator_->update_model(filtered_acc_z_);
         std_msgs::msg::Float64MultiArray debug_msg;
         debug_msg.data = {
             height_estimator_->getHeight(),   // [0] fused
