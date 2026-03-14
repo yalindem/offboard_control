@@ -10,7 +10,7 @@ namespace Drone::px4_offboard
 {
     OffboardController::OffboardController(std::string node_name) : Node(node_name)
     {
-        //height_estimator_ = std::make_unique<Estimator::HeightEstimator>();
+        height_estimator_ = std::make_unique<Estimator::HeightEstimator>();
 
         rclcpp::QoS qos_profile = rclcpp::QoS(1).best_effort(); 
         vehicle_command_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
@@ -122,6 +122,12 @@ namespace Drone::px4_offboard
     {
         float current_p = msg->pressure * 0.01f; // hPa cinsinden
 
+        if (kf_state_ == HeightEstimatorState::offline)
+        {
+            height_estimator_->init(barometric_height_);
+            kf_state_ = HeightEstimatorState::init;
+        }
+
         if (!this->is_baro_ready_)
         {
             this->initial_pressure_ = current_p;
@@ -130,6 +136,7 @@ namespace Drone::px4_offboard
             this->last_filtered_height_ = 0.0f;  
             
             RCLCPP_INFO(this->get_logger(), "Barometre Sıfırlandı: %.2f hPa", initial_pressure_);
+
             return; 
         }
         float raw_height = calculate_barometric_height(current_p, msg->temperature);
@@ -152,9 +159,8 @@ namespace Drone::px4_offboard
         
         barometric_height_ = rate_limited_height;
         last_filtered_height_ = rate_limited_height;
-        std::cout << "--------------------------------------------------\n";
-        RCLCPP_INFO(this->get_logger(), "barometric_height: %.3f (raw: %.3f, median: %.3f)", 
-                    barometric_height_, raw_height, median_height);
+        
+        height_estimator_->update_measurement(barometric_height_);
     }
     
     void OffboardController::attitude_callback(const VehicleAttitudeMessage::SharedPtr msg)
@@ -176,7 +182,8 @@ namespace Drone::px4_offboard
         imu_height_ += (imu_velo_z_ * delta_t) + (0.5f * filtered_acc_z_ * delta_t * delta_t);
         //std::cout << "imu_height_: " << imu_height_ << std::endl;
 
-        //height_estimator_->update_state(barometric_height_, imu_height_, imu_velo_z_);
+        height_estimator_->update_model(imu_height_);
+        std::cout << "Fused height: " << height_estimator_->getHeight() << std::endl;
     }
 
     bool OffboardController::is_static_bias_calculated(float acc)
@@ -201,21 +208,21 @@ namespace Drone::px4_offboard
     {
         this->pre_flight_checks_pass_ = msg->pre_flight_checks_pass;
 
-        //if(this->is_baro_ready_ == false)
-        //{
-        //    this->pre_flight_checks_pass_ = false;
-        //}
+        if(this->is_baro_ready_ == false)
+        {
+            this->pre_flight_checks_pass_ = false;
+        }
 
         switch (msg->arming_state)
         {
             case px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED:
-                this->state_ = State::armed;
+                this->state_ = DroneState::armed;
                 break;
             case px4_msgs::msg::VehicleStatus::ARMING_STATE_DISARMED:
-                this->state_ = State::disarmed;
+                this->state_ = DroneState::disarmed;
                 break;
             default:
-                this->state_ = State::pre_flight;
+                this->state_ = DroneState::pre_flight;
                 break;
         }
 
@@ -295,20 +302,20 @@ namespace Drone::px4_offboard
                 RCLCPP_WARN(this->get_logger(), "Navigation state: %d", this->nav_state_);
                 this->switch_to_offboard_mode();
             }
-            else if(this->nav_state_ == NavState::offboard && this->state_ != State::armed && this->is_armed_ == false)
+            else if(this->nav_state_ == NavState::offboard && this->state_ != DroneState::armed && this->is_armed_ == false)
             {
                 RCLCPP_WARN(this->get_logger(), "State: %d", this->state_);
                 this->arm();
                 this->publish_trajectory_setpoint(0.0, 0.0, 0.0, -3.14); 
             }
-            else if(this->state_ == State::armed && this->is_armed_ == false)
+            else if(this->state_ == DroneState::armed && this->is_armed_ == false)
             {
                 RCLCPP_INFO(this->get_logger(), "Armed");
                 this->is_armed_ = true;
             }
 
             /*
-            if(this->state_ == State::armed && this->is_armed_)
+            if(this->state_ == DroneState::armed && this->is_armed_)
             {
                 if (!waypoints.empty()) 
                 {

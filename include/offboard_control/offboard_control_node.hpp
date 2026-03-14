@@ -45,7 +45,7 @@ using VehicleSensorGPSSubscriber = rclcpp::Subscription<VehicleSensorGPSMessage>
 using VehicleLocalPositionMessage = px4_msgs::msg::VehicleLocalPosition;
 using VehicleLocalPositionSubscriber = rclcpp::Subscription<VehicleLocalPositionMessage>::SharedPtr;
 
-enum State {
+enum DroneState {
     pre_flight = 0,
     armed = 1,    
     on_air = 2,
@@ -58,6 +58,14 @@ enum NavState {
     position = 2,
     offboard = 14
 };
+
+enum HeightEstimatorState {
+    offline = 0,
+    init = 1,
+    active = 2,
+    deactive = 3
+};
+
 
 struct Waypoint
 {
@@ -82,7 +90,7 @@ namespace Drone::px4_offboard
 
         private:
             VehicleCommandSharedPtr vehicle_command_client_;
-            std::unique_ptr<Estimator::HeightEstimator> height_estimator_;
+            std::unique_ptr<Drone::Estimator::HeightEstimator> height_estimator_;
             
             void arm();
             void request_vehicle_command(std::uint16_t command, float param1 = 0.0, float param2 = 0.0);
@@ -114,8 +122,9 @@ namespace Drone::px4_offboard
 
             bool arming_requested_{false};
 
-            State state_ {State::pre_flight};
+            DroneState state_ {DroneState::pre_flight};
             NavState nav_state_ {NavState::manual};
+            HeightEstimatorState kf_state_ {HeightEstimatorState::offline};
 
             TrajectorySetpointPublisher trajectory_pub_;
             OffboardControlModePublisher offboard_mode_pub_;

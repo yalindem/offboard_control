@@ -1,19 +1,26 @@
 #ifndef CPP_HEIGHT_ESTIMATOR
 #define CPP_HEIGHT_ESTIMATOR
 #include "iostream"
+#include <memory>  
+#include "kalman_filter.hpp"
 
 namespace Drone::Estimator
 {
     class HeightEstimator
     {
+
         public:
             HeightEstimator();
-            void update_state(float baro_height, float imu_height, float imu_velo_z);
-        
+
+            void init(double initial_baro_height);
+            void update_model(double u);
+            void update_measurement(double z);
+            double getHeight() const;
+
         private:
             
-            float fused_height_{0.0f};
-            const float KF_GAIN = 0.02f;
+            double fused_height_{0.0f};
+            std::unique_ptr<Drone::Filter::KalmanFilter<3>> kf_;
     };
 }
 

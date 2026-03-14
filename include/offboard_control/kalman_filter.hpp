@@ -3,7 +3,7 @@
 
 #include <Eigen/Dense>
 
-namespace Drone::px4_offboard
+namespace Drone::Filter
 {
 
 // [1] Template parametresi: R state boyutu, C ise F matrisinin sütun sayısı.
@@ -61,14 +61,14 @@ public:
     //     çalışmak undefined behavior üretir. initialized_ flag'i eklendi;
     //     debug modunda assert ile korunuyor, release'de sıfır maliyet.
     void prediction(double u)
-    {
+    {   
         assert(initialized_ && "KalmanFilter::prediction() called before init()");
 
         x_ = F_ * x_ + B_ * u;
         P_ = F_ * P_ * F_.transpose() + Q_;
     }
 
-    double update(double z)
+    void update(double z)
     {
         assert(initialized_ && "KalmanFilter::update() called before init()");
 
@@ -95,8 +95,6 @@ public:
         //     Uzun süreli uçuşlarda bu kritik fark yaratır.
         const StateMat IKH = StateMat::Identity() - K_ * H_;
         P_ = IKH * P_ * IKH.transpose() + K_ * R_.value() * K_.transpose();
-
-        return y;
     }
 
     // [8] getState() önceki versiyonda by-value dönüyordu — küçük sabit
