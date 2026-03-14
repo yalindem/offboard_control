@@ -100,6 +100,16 @@ namespace Drone::Estimator
     { 
         return kf_->getState()(0); 
     }
+
+    double HeightEstimator::getVelo() const
+    {
+        return kf_->getState()(1);
+    }
+
+    double HeightEstimator::getBias() const
+    {
+        return kf_->getState()(2);
+    }
     
     void HeightEstimator::update_measurement(double z)
     {

@@ -16,7 +16,9 @@ namespace Drone::Estimator
             void update_model(double u);
             void update_measurement(double z);
             double getHeight() const;
-
+            double getVelo() const;
+            double getBias() const;
+        
         private:
             
             double fused_height_{0.0f};
