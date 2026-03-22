@@ -325,6 +325,15 @@ namespace Drone::px4_offboard
                 RCLCPP_INFO(this->get_logger(), "Armed");
                 this->is_armed_ = true;
             }
+            else if(this->is_armed_ && this->state_ != DroneState::on_air)
+            {
+                this->state_ = DroneState::on_air;
+                this->publish_trajectory_setpoint(0.0, 0.0, -5.0, -3.14);
+            }
+            else if(this->state_ == DroneState::on_air)
+            {
+                this->publish_trajectory_setpoint(0.0, 0.0, -5.0, -3.14);
+            }
 
             /*
             if(this->state_ == DroneState::armed && this->is_armed_)

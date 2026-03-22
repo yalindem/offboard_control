@@ -55,7 +55,7 @@ def start_ros_launch():
     try:
         print("--- [4/4] ROS2 Launch Başlatılıyor... ---")
         # Önce workspace'i source eder, sonra launch komutunu çalıştırır
-        command = "source ~/workspace/ros_ws/install/setup.bash && ros2 launch offboard_control drone_bringup.launch.py"
+        command = "source ~/ros_ws/install/setup.bash && ros2 launch offboard_control drone_bringup.launch.py"
         
         # executable='/bin/bash' ekliyoruz çünkü 'source' bir bash komutudur
         ros_process = subprocess.Popen(
